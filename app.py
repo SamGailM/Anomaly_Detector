@@ -21,10 +21,12 @@ df = load_data()
 
 after_hours = df[df["is_after_hours"]]
 anomaly_counts = after_hours.groupby("user_id").size().reset_index(name="after_hours_count")
-threshold = anomaly_counts["after_hours_count"].mean() + 2 * anomaly_counts["after_hours_count"].std()
+threshold = anomaly_counts["after_hours_count"].mean() + 1.5 * anomaly_counts["after_hours_count"].std()
 flaggedUsers = anomaly_counts[anomaly_counts["after_hours_count"] >= threshold].sort_values(
     "after_hours_count", ascending=False
 )
+
+
 # create summary metrics
 
 col1, col2, col3, col4 = st.columns(4)
@@ -111,18 +113,18 @@ if prompt := st.chat_input("e.g. Which users look most suspicious and why?"):
         specific, and use audit terminology. Reference actual user IDs and
         numbers from the data provided."""
 
-    client = OpenAI(api_key=api_key)
-    with st.chat_message("assistant"):
-        with st.spinner("Analyzing..."):
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Data context:\n{summary}\n\nQuestion: {prompt}"}
-                ]
-            )
-            answer = response.choices[0].message.content
-            st.write(answer)
-            st.session_state.messages.append({"role": "assistant", "content": answer})
+        client = OpenAI(api_key=api_key)
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing..."):
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Data context:\n{summary}\n\nQuestion: {prompt}"}
+                    ]
+                )
+                answer = response.choices[0].message.content
+                st.write(answer)
+                st.session_state.messages.append({"role": "assistant", "content": answer})
 
-    
+        
