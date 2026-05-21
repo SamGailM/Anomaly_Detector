@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import anthropic
+from openai import OpenAI
 
 st.set_page_config(page_title="Access Log Anomaly Detector", layout="wide")
 st.title("Access Log Anomaly Detector")
@@ -66,10 +66,63 @@ st.divider()
 
 st.subheader("Flagged user detail")
 if not flaggedUsers.empty:
-    detail = df[df["user_id"].isin(flaggedUsers["user_id"])].merge(flagged_users, on="user_id")
+    detail = df[df["user_id"].isin(flaggedUsers["user_id"])].merge(flaggedUsers, on="user_id")
     flagged_detail = detail[detail["is_after_hours"]][
         ["user_id", "timestamp", "location", "after_hours_count"]
     ].sort_values("timestamp", ascending=False)
     st.dataframe(flagged_detail, use_container_width=True, hide_index=True)
 
 st.divider()
+
+# create ai chat
+
+st.subheader("Ask AI analyst")
+st.caption("Ask question about access log data in plain English")
+
+api_key = st.text_input("OpenAI API key", type="password", placeholder="sk-...")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
+
+if prompt := st.chat_input("e.g. Which users look most suspicious and why?"):
+    if not api_key:
+        st.warning("Please enter Anthropic API key above")
+    else:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
+        
+        summary = f"""
+        Access log dataset summary:
+        - Total records: {len(df):,}
+        - Unique users: {df['user_id'].nunique()}
+        - Date range: {df['date'].min()} to {df['date'].max()}
+        - After-hours events (outside 7am-7pm): {len(after_hours)}
+        - Anomaly threshold (mean + 2 std dev): {threshold:.1f} after-hours events
+        - Flagged users: {flaggedUsers.to_string(index=False) if not flaggedUsers.empty else 'None'}
+        - Top locations accessed after hours: {after_hours['location'].value_counts().head(3).to_string()}
+        """
+        
+        system_prompt = """You are an internal audit AI analyst. You help auditors
+        identify anomalies and control gaps in access log data. Be concise,
+        specific, and use audit terminology. Reference actual user IDs and
+        numbers from the data provided."""
+
+    client = OpenAI(api_key=api_key)
+    with st.chat_message("assistant"):
+        with st.spinner("Analyzing..."):
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Data context:\n{summary}\n\nQuestion: {prompt}"}
+                ]
+            )
+            answer = response.choices[0].message.content
+            st.write(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+
+    
