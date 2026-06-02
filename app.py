@@ -21,7 +21,7 @@ df = load_data()
 
 after_hours = df[df["is_after_hours"]]
 anomaly_counts = after_hours.groupby("user_id").size().reset_index(name="after_hours_count")
-threshold = anomaly_counts["after_hours_count"].mean() + 1.5 * anomaly_counts["after_hours_count"].std()
+threshold = anomaly_counts["after_hours_count"].mean() + 1.5 * anomaly_counts["after_hours_count"].std() #update to change thresholding, 1.5 for 1.5 standard deviations
 flaggedUsers = anomaly_counts[anomaly_counts["after_hours_count"] >= threshold].sort_values(
     "after_hours_count", ascending=False
 )
